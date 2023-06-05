@@ -20,18 +20,34 @@ def bound(value, low, high):
 
 # Default parameters (name, default value, description)
 DEFAULT_PARAMS = [
-        ('pwm_freq_hz', 200, "PWM and LED frequency in Hz"),
-        ('pwm_value_center', 1228, "PWM duty cycle (12-bit) for center value (1500us)"),
-        ('pwm_value_forward', 1556, "PWM duty cycle (12-bit) for full-forward value (1900us)"),
-        ('pwm_value_reverse', 901, "PWM duty cycle (12-bit) for full-reverse value (1100us)"),
-        ('led_max_duty', 2047, "LED duty cycle (12-bit) for full on"),
-        ('gimbal_pitch_center', 1228, "PWM duty cycle (12-bit) for gimbal pitch center (0deg)"),
-        ('gimbal_pitch_pos45', 1392, "PWM duty cycle (12-bit) for gimbal pitch pos 45deg"),
-        ('gimbal_pitch_neg45', 1064, "PWM duty cycle (12-bit) for gimbal pitch neg 45deg"),
-        ('gimbal_roll_center', 1228, "PWM duty cycle (12-bit) for gimbal roll center (0deg)"),
-        ('gimbal_roll_pos45', 1392, "PWM duty cycle (12-bit) for gimbal roll pos 45deg"),
-        ('gimbal_roll_neg45', 1064, "PWM duty cycle (12-bit) for gimbal roll neg 45deg"),
-    ]
+    ("pwm_freq_hz", 200, "PWM and LED frequency in Hz"),
+    ("pwm_value_center", 1228, "PWM duty cycle (12-bit) for center value (1500us)"),
+    (
+        "pwm_value_forward",
+        1556,
+        "PWM duty cycle (12-bit) for full-forward value (1900us)",
+    ),
+    (
+        "pwm_value_reverse",
+        901,
+        "PWM duty cycle (12-bit) for full-reverse value (1100us)",
+    ),
+    ("led_max_duty", 2047, "LED duty cycle (12-bit) for full on"),
+    (
+        "gimbal_pitch_center",
+        1228,
+        "PWM duty cycle (12-bit) for gimbal pitch center (0deg)",
+    ),
+    ("gimbal_pitch_pos45", 1392, "PWM duty cycle (12-bit) for gimbal pitch pos 45deg"),
+    ("gimbal_pitch_neg45", 1064, "PWM duty cycle (12-bit) for gimbal pitch neg 45deg"),
+    (
+        "gimbal_roll_center",
+        1228,
+        "PWM duty cycle (12-bit) for gimbal roll center (0deg)",
+    ),
+    ("gimbal_roll_pos45", 1392, "PWM duty cycle (12-bit) for gimbal roll pos 45deg"),
+    ("gimbal_roll_neg45", 1064, "PWM duty cycle (12-bit) for gimbal roll neg 45deg"),
+]
 
 LED_CHANNEL = 12
 SERVO_PITCH_CHANNEL = 10  # Servo1 output
@@ -39,9 +55,6 @@ SERVO_ROLL_CHANNEL = 11  # Servo2 output
 
 
 class Hyperdrive(Node):
-
-
-
     def __init__(self):
         super().__init__("hyperdrive")
 
@@ -71,12 +84,16 @@ class Hyperdrive(Node):
         )
 
         # Initialize parameters
-        self.declare_parameters('', [
-            (name, default, ParameterDescriptor(description=desc)) for (name, default, desc) in DEFAULT_PARAMS
-            ])
+        self.declare_parameters(
+            "",
+            [
+                (name, default, ParameterDescriptor(description=desc))
+                for (name, default, desc) in DEFAULT_PARAMS
+            ],
+        )
 
         # Initialize services
-        self.create_service(SetBool, 'enable_pwm', self.enable_pwm_callback)
+        self.create_service(SetBool, "enable_pwm", self.enable_pwm_callback)
 
         # Create publish timer
         pub_timer_period = 0.02
@@ -89,29 +106,28 @@ class Hyperdrive(Node):
         # TODO: instantiate depth sensor
         self.get_logger().info("Instantiating depth sensor")
 
-
     def enable_pwm_callback(self, request, response):
         """ROS service to enable or disable the PCA9685 PWM generation."""
-        self.pca9685.enabled = request.data        
+        self.pca9685.enabled = request.data
         response.success = True
         return response
 
     def remap_motor(self, percent):
         """
-        Remaps a desired bidirectional ESC output (-100% to 100%) to a 12-bit 
+        Remaps a desired bidirectional ESC output (-100% to 100%) to a 12-bit
         PWM duty cycle (0-4095).
 
         Remapping is performed via linear interpolation between the center
         duty cycle and the forward or reverse maximum.
         """
-        center = self.get_parameter('pwm_value_center')
+        center = self.get_parameter("pwm_value_center")
 
         if percent >= 0:
-            forward = self.get_parameter('pwm_value_forward')
-            res = (forward - center)/100.0 * percent + center
+            forward = self.get_parameter("pwm_value_forward")
+            res = (forward - center) / 100.0 * percent + center
         else:
-            reverse = self.get_parameter('pwm_value_reverse')
-            res = (reverse - center)/100.0 * percent + center
+            reverse = self.get_parameter("pwm_value_reverse")
+            res = (reverse - center) / 100.0 * percent + center
 
         return res
 
@@ -129,10 +145,12 @@ class Hyperdrive(Node):
     def led_callback(self, msg):
         """Update LED power level on new message."""
         self.led_power = bound(msg.data, 0, 100)
-        max_output = self.get_parameter('led_max_duty')
+        max_output = self.get_parameter("led_max_duty")
         output = int(self.led_power * max_output / 4095.0)
 
-        self.get_logger().debug(f"Setting LED power level to {self.led_power} (duty: {output})")
+        self.get_logger().debug(
+            f"Setting LED power level to {self.led_power} (duty: {output})"
+        )
         self.pca9685.set_pwm(LED_CHANNEL, output)
 
     def motors_callback(self, msg):
@@ -145,9 +163,13 @@ class Hyperdrive(Node):
     def servo_callback(self, msg, servo_id):
         """Update gimbal servo outputs on new message."""
         self.servos[servo_id] = bound(msg.data, 0.0, 100.0)
-        self.get_logger().debug(f"Setting servo {servo_id+1} to {self.servos[servo_id]}")
+        self.get_logger().debug(
+            f"Setting servo {servo_id+1} to {self.servos[servo_id]}"
+        )
         # TODO: re-write in terms of angles
-        self.pca9685.set_pwm(servo_id + SERVO_PITCH_CHANNEL, self.remap_motor(self.servos[servo_id]))
+        self.pca9685.set_pwm(
+            servo_id + SERVO_PITCH_CHANNEL, self.remap_motor(self.servos[servo_id])
+        )
 
     def servo1_callback(self, msg):
         self.servo_callback(msg, 0)
