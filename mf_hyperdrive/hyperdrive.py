@@ -162,7 +162,7 @@ class Hyperdrive(Node):
 
     def servo_callback(self, msg, servo_id):
         """Update gimbal servo outputs on new message."""
-        self.servos[servo_id] = bound(msg.data, 0.0, 100.0)
+        self.servos[servo_id] = bound(msg.data, -100.0, 100.0)
         self.get_logger().debug(
             f"Setting servo {servo_id+1} to {self.servos[servo_id]}"
         )
