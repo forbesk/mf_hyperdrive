@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools', 'PCA9685-driver', 'Jetson.GPIO'],
+    install_requires=['setuptools', 'PCA9685-driver', 'Jetson.GPIO', 'pyserial', 'crc'],
     zip_safe=True,
     maintainer='Kevin Forbes',
     maintainer_email='forbesk9@gmail.com',
