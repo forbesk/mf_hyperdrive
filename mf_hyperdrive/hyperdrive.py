@@ -1,3 +1,4 @@
+from typing import List
 import rclpy
 from rclpy.node import Node, Parameter
 from rcl_interfaces.msg import ParameterDescriptor
@@ -6,11 +7,13 @@ from std_msgs.msg import String
 from std_msgs.msg import UInt8
 from std_msgs.msg import Float64MultiArray
 from std_msgs.msg import Float64
+from std_msgs.msg import Bool
 from sensor_msgs.msg import Temperature
 
 from std_srvs.srv import SetBool
 
 from mf_hyperdrive.pca9685 import PCA9685
+from mf_hyperdrive.powercore import PowerCore, PowerCoreMsg
 
 
 def bound(value, low, high):
@@ -61,8 +64,11 @@ class Hyperdrive(Node):
         self.depth_m: float = 0.0
         self.temp_c: float = 0.0
         self.led_power: int = 0
-        self.motors: list[float] = [0.0] * 9
-        self.servos: list[float] = [0.0] * 2
+        self.motors: List[float] = [0.0] * 9
+        self.servos: List[float] = [0.0] * 2
+        self.mission: bool = False
+        self.voltage: float = 0.0
+        self.currents: List[float] = [0.0] * 12
 
         # Initialize PWM generator
         self.pca9685 = PCA9685()
@@ -70,6 +76,10 @@ class Hyperdrive(Node):
         # Initialize topics
         self.depth_pub = self.create_publisher(Float64, "depth", 10)
         self.temp_pub = self.create_publisher(Temperature, "temp", 10)
+        self.voltage_pub = self.create_publisher(Float64, "battery_voltage", 10)
+        self.mission_pub = self.create_publisher(Bool, "mission_switch", 10)
+        self.currents_pub = self.create_publisher(Float64MultiArray, "currents", 10)
+
         self.led_power_sub = self.create_subscription(
             UInt8, "led", self.led_callback, 10
         )
@@ -105,6 +115,11 @@ class Hyperdrive(Node):
 
         # TODO: instantiate depth sensor
         self.get_logger().info("Instantiating depth sensor")
+
+        # Instantiate power core
+        self.get_logger().info("Instantiating power core")
+        self.pc = PowerCore(callback=self.power_callback)
+        self.pc.connect()
 
     def enable_pwm_callback(self, request, response):
         """ROS service to enable or disable the PCA9685 PWM generation."""
@@ -176,6 +191,11 @@ class Hyperdrive(Node):
 
     def servo2_callback(self, msg):
         self.servo_callback(msg, 1)
+
+    def power_callback(self, msg: PowerCoreMsg):
+        self.mission_pub.publish(Bool(data=msg.mission))
+        self.voltage_pub.publish(Float64(data=msg.voltage))
+        self.currents_pub.publish(Float64MultiArray(data=msg.currents))
 
 
 def main(args=None):
